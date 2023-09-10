@@ -1,51 +1,6 @@
 def PROTOCOL_VERSION equ 1
 def PROTOCOL_BITMASK equ 1
 
-; we've got loads of space, this ends up taking up only $924 bytes!!
-macro SGB_Start_Packet
-    ld [hl], $00
-    rept 2
-        nop
-    endr
-    ld [hl], $30
-    rept 12
-        nop
-    endr
-endm
-
-macro SGB_Send_Zero
-    ld [hl], $20
-    rept 2
-        nop
-    endr
-    ld [hl], $30
-    rept 12
-        nop
-    endr
-endm
-
-macro SGB_Send_One
-    ld [hl], $10
-    rept 2
-        nop
-    endr
-    ld [hl], $30
-    rept 12
-        nop
-    endr
-endm
-
-macro SGB_Send_A
-    ld [hl], a
-    rept 3
-        nop
-    endr
-    ld [hl], $30
-    rept 12
-        nop
-    endr
-endm
-
 section "ROM", ROM0[$0000]
 ; Page 0 routines
     jr RST_00
@@ -108,9 +63,8 @@ Platform_Check:
     set 1, c
 .not_GBC:
     ; SGB check
-    ld hl, $ff00
-    ld a, $10
-    call Send_MLT_REQ_Packet
+    ld hl, MLT_REQ_packet_two_players
+    call Send_SGB_Packet
     call Frame_Wait
     call Frame_Wait
     call Frame_Wait
@@ -124,8 +78,8 @@ Platform_Check:
     cp b
     jr z, .not_SGB
     set 2, c
-    ld a, $20
-    call Send_MLT_REQ_Packet
+    ld hl, MLT_REQ_packet_one_player
+    call Send_SGB_Packet
 .not_SGB:
     ld a, c
     ldh [system_byte], a
@@ -158,16 +112,16 @@ Connect_Prompt:
     xor a
     cpl
     ld c, $ff69 - $ff00
-rept 8
-    ldh [c], a
-    ldh [c], a
-    cpl
-rept 3
-    ldh [c], a
-    ldh [c], a
-endr
-    cpl
-endr
+    rept 8
+        ldh [c], a
+        ldh [c], a
+        cpl
+        rept 3
+            ldh [c], a
+            ldh [c], a
+        endr
+        cpl
+    endr
 .load_string:
     ; clear background
     ld a, $20
@@ -247,18 +201,18 @@ Establish_Connection:
     or a
     call z, Panic
     cp PROTOCOL_VERSION
-    jr c, .compatible_version
-    jr z, .compatible_version
+    jr c, .compatible_protocol
+    jr z, .compatible_protocol
     ld a, $ff
     call Send_Byte
     call Panic
-.compatible_version:
+.compatible_protocol:
     ld b, a
     xor a
     call Send_Byte
-    ; there's only one version, v1, so we can assume v1
+    ; there's only one protocol, 1, so we can assume 1
 
-Protocol_V1:
+Protocol_1:
     ldh a, [system_byte]
     call Send_Byte
     call Receive_Byte
@@ -394,37 +348,37 @@ Frame_Wait:
     ret
 
 ; parameters:
-;   a: set to $10 to enable multiple joypads, and $20 to disable
-;   hl: set to $ff00
-Send_MLT_REQ_Packet:
-    ; start packet
-    SGB_Start_Packet
-    ; byte 0: (command << 3) | length_packets. ($11 << 3) | 1 -> $89 -> 10001001 -> 10010001 (LSB first)
-    SGB_Send_One
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_One
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_One
-    ; byte 1: multiplayer control (0 - One Player, 1 - Two Player, 3 - Four Player) - AA000000 (LSB first)
-    SGB_Send_A
-    SGB_Send_A
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_Zero
-    SGB_Send_Zero
-    ; byte 2-f: zero
-    rept $f - 2 + 1
-        rept 8
-            SGB_Send_Zero
-        endr
-    endr
-    ; last bit to end packet (why?)
-    SGB_Send_Zero
+;   hl: packet location
+; destroys a, b, d, and e
+Send_SGB_Packet:
+    xor a
+    ldh [$ff00], a
+    ld a, $30
+    ldh [$ff00], a
+
+    ld d, 16
+.packet_loop:
+    ld b, [hl]
+    inc hl
+    ld e, 8
+.byte_loop:
+    ld a, $10
+    srl b
+    jr c, .one
+    add a, a
+.one:
+    ldh [$ff00], a
+    ld a, $30
+    ldh [$ff00], a
+    dec e
+    jr nz, .byte_loop
+    dec d
+    jr nz, .packet_loop
+
+    ld a, $20
+    ldh [$ff00], a
+    ld a, $30
+    ldh [$ff00], a
     ret
 
 ; =======================
@@ -437,6 +391,12 @@ Tile_Data_End:
 
 connect_prompt:
     db "Press Start after\nconnecting a cable.", 0
+
+MLT_REQ_packet_two_players:
+    db $89, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
+MLT_REQ_packet_one_player:
+    db $89, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 section "HRAM", HRAM[$ff80]
 system_byte:

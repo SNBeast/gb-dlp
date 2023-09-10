@@ -12,19 +12,19 @@ All strings shall be null-terminated UTF-8. "$" is this document's chosen hexade
 - Client sends "gb-dlp".
 - Host replies with "gb-dlp".
 
-# Version Negotiation Protocol
+# Protocol Negotiation Protocol
 - Client sends bitmask of supported protocols.
-    - Bit 0: on if client supports Protocol v1
-    - Other bits: reserved
-- Host sends byte numerically specifying which version among those versions it would like to use. For example, $01 for v1, or $05 for a hypothetical v5. If the host supports none of the versions in the bitmask, it replies with $00.
-- If the host responds with a version that the client does not support, or the host responds with $00, the client responds with $ff and the connection is terminated. Otherwise, a response of $00 is sent and the host's chosen protocol is initiated.
+    - Bit 0: On if client supports Protocol 1
+    - Other bits: Reserved
+- Host sends byte numerically specifying which protocol among those protocols it would like to use. For example, $01 for 1, or $05 for a hypothetical 5. If the host supports none of the protocols in the bitmask, it replies with $00.
+- If the host responds with a protocol that the client does not support, or the host responds with $00, the client responds with $ff and the connection is terminated. Otherwise, a response of $00 is sent and the host's chosen protocol is initiated.
 
-# Protocol v1
+# Protocol 1
 ## Protocol overview
 - Client sends a system byte:
-    - bit 0: on if client is GBC-compatible
-    - bit 1: on if client is GBC-compatible and on GBA
-    - bit 2: on if client is SGB-compatible
+    - Bit 0: On if client is GBC-compatible
+    - Bit 1: On if client is GBC-compatible and on GBA
+    - Bit 2: On if client is SGB-compatible
 - Host sends $00 if the platform is supported, or any other value otherwise. If the response is not $00, the client responds with $ff and the connection is terminated.
 - The client's LCD turns off (and stays off into handoff) so data can be sent to VRAM.
 - When the client is ready, it sends any byte.
@@ -32,18 +32,17 @@ All strings shall be null-terminated UTF-8. "$" is this document's chosen hexade
 - The host then sends segments (see format below).
 - A segment of size $0000 is the last segment.
 - Addresses $ff01-$ff02 (serial data and control), $ff0f (IF), $ff95-$ff96 (stack word), and $ffff (IE) must not be modified until after handoff.
-- Do not write to cart-mapped addresses.
 
 ## Segment format
-- 2 bytes: start address
-- 2 bytes: length
-- (length) bytes: data
+- 2 bytes: Start Address
+- 2 bytes: Length
+- (Length) bytes: Data
 
 ## Handoff state
 All state not specified and not sent by segments must not be depended upon.
 - IME: Off
 - IE: $08
-- HL and PC: Specified entrypoint
-- LCD is off unless turned on by segment
-- SGB multiplayer is disabled unless turned on by segment
-- Timer state should not be depended upon
+- HL and PC: Specified entrypoint.
+- LCD is off unless turned on by segment.
+- SGB multiplayer is disabled unless turned on by segment.
+- Timer state should not be depended upon.
